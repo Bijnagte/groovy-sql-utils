@@ -1,0 +1,161 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.2'
+    }
+}
+
+apply plugin: 'groovy'
+apply plugin: 'jacoco'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'maven'
+apply plugin: 'signing'
+apply plugin: 'findbugs'
+apply plugin: 'checkstyle'
+
+group = 'com.nagternal'
+version = '0.1.0-SNAPSHOT'
+description = 'Transaction management and other utilities for groovy sql'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy-all:2.4.7'
+    compile 'org.slf4j:slf4j-api:1.7.21'
+
+    testCompile 'org.spockframework:spock-core:1.0-groovy-2.4'
+    testCompile 'cglib:cglib-nodep:3.2.4'
+    testCompile 'org.objenesis:objenesis:2.4'
+
+    testCompile 'com.h2database:h2:1.4.192'
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+    }
+}
+
+tasks.withType(FindBugs) {
+    reports {
+        xml.enabled false
+        html.enabled true
+    }
+}
+
+findbugs {
+    sourceSets = [sourceSets.main]
+}
+
+checkstyle {
+    toolVersion = '7.2'
+    sourceSets = [project.sourceSets.main]
+}
+
+task sourceJar(type: Jar) {
+    group 'Build'
+    description 'An archive of the source code'
+    classifier 'sources'
+    from sourceSets.main.allSource
+    from "${projectDir}/LICENSE"
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc
+}
+
+check {
+    dependsOn jacocoTestReport
+}
+
+build {
+    dependsOn sourceJar, javadocJar
+}
+
+artifacts {
+    archives jar
+    archives sourceJar
+    archives javadocJar
+}
+
+signing {
+    sign configurations.archives
+}
+
+if (project.hasProperty('ossrhUser')) { // TODO: setup maven central
+    uploadArchives {
+        repositories {
+            mavenDeployer {
+                // POM signature
+                beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+                // Target repository
+
+                def repoUrl = version.endsWith('SNAPSHOT') ?
+                        'https://oss.sonatype.org/content/repositories/snapshots' :
+                        'https://oss.sonatype.org/service/local/staging/deploy/maven2'
+
+                repository(url: repoUrl) {
+                    authentication(userName: ossrhUser, password: ossrhPassword)
+                }
+                pom.project {
+                    name project.name
+                    description project.description
+                    packaging 'jar'
+                    url 'https://github.com/Bijnagte/groovy-sql-utils'
+
+                    scm {
+                        connection 'scm:git:https://github.com/Bijnagte/groovy-sql-utils.git'
+                        developerConnection 'scm:git:git@github.com:Bijnagte/groovy-sql-utils.git'
+                        url 'https://github.com/Bijnagte/groovy-sql-utils.git'
+                    }
+
+                    licenses {
+                        license {
+                            name 'The MIT License (MIT)'
+                            url 'http://opensource.org/licenses/MIT'
+                            distribution 'repo'
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id = 'dylanbijnagte@gmail.com'
+                            name = 'Dylan Bijnagte'
+                            email = 'dylanbijnagte@gmail.com'
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+bintray {
+    user = project.properties.bintrayUser
+    key = project.properties.bintrayApiKey
+
+    configurations = ['archives']
+    dryRun = false
+    publish = true
+    pkg {
+        repo = 'nagternal'
+        name = project.name
+        desc = project.description
+        issueTrackerUrl = 'https://github.com/Bijnagte/groovy-sql-utils/issues'
+        vcsUrl = 'https://github.com/Bijnagte/groovy-sql-utils.git'
+        licenses = ['MIT']
+        labels = ['groovy']
+        publicDownloadNumbers = true
+    }
+}
+

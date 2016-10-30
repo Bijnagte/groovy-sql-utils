@@ -1,0 +1,16 @@
+machine:
+  java:
+    version:
+      oraclejdk8
+
+test:
+  override:
+    - ./gradlew check
+  post:
+    # Archive the junit files
+    - cp build/test-results/*.xml $CIRCLE_TEST_REPORTS/ || true
+
+    # Archive the jar files that were output
+    - cp build/libs/groovy-sql-utils*.jar $CIRCLE_ARTIFACTS/ || true
+
+    - bash <(curl -s https://codecov.io/bash)
